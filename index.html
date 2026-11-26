@@ -42,9 +42,6 @@ let keys = {};
 let spawnTimer = 0;
 let difficulty = 1;
 
-function resize() {
-  // keep fixed for simplicity
-}
 window.addEventListener('keydown', e => keys[e.key] = true);
 window.addEventListener('keyup', e => keys[e.key] = false);
 canvas.addEventListener('mousemove', e => {
@@ -90,13 +87,13 @@ function update() {
     spawnTimer = 0;
   }
 
-  items.forEach((item, i) => {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
     item.y += item.speed;
     if (item.y > canvas.height) {
       items.splice(i, 1);
-      return;
+      continue;
     }
-    // collision
     if (item.x < player.x + player.width &&
         item.x + item.size > player.x &&
         item.y < player.y + player.height &&
@@ -113,14 +110,15 @@ function update() {
       }
       items.splice(i, 1);
     }
-  });
+  }
 
-  particles.forEach((p, i) => {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
     p.x += p.vx;
     p.y += p.vy;
     p.life--;
     if (p.life <= 0) particles.splice(i, 1);
-  });
+  }
 
   difficulty = 1 + score / 200;
   scoreEl.textContent = score;
@@ -130,13 +128,11 @@ function update() {
 function draw() {
   ctx.fillStyle = '#050510';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  // stars background
   for (let i = 0; i < 50; i++) {
     ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.5})`;
     ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 1, 1);
   }
 
-  // player neon paddle
   ctx.fillStyle = '#00ffff';
   ctx.shadowBlur = 15;
   ctx.shadowColor = '#00ffff';
@@ -191,7 +187,6 @@ function startGame() {
   gameRunning = true;
   messageEl.textContent = 'Catch the yellow stars! Avoid red asteroids!';
   startBtn.style.display = 'none';
-  gameLoop();
 }
 
 function endGame() {
@@ -209,7 +204,7 @@ function endGame() {
 }
 
 startBtn.addEventListener('click', startGame);
-gameLoop(); // for initial draw
+gameLoop();
 </script>
 </body>
 </html>
