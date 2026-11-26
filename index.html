@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neon Cosmic Catcher - Daily Fun Game</title>
+<style>
+body { margin:0; background:#0a0a1a; color:#fff; font-family: 'Segoe UI', sans-serif; display:flex; flex-direction:column; align-items:center; min-height:100vh; }
+#gameCanvas { border:2px solid #00ffff; border-radius:10px; box-shadow:0 0 20px #00ffff; margin-top:20px; background:#050510; }
+.ui { margin:10px; text-align:center; }
+button { background:#00ffff; color:#000; border:none; padding:10px 20px; font-size:18px; border-radius:5px; cursor:pointer; box-shadow:0 0 10px #00ffff; }
+button:hover { background:#00cccc; }
+h1 { color:#00ffff; text-shadow:0 0 10px #00ffff; }
+.score { font-size:24px; color:#ffff00; }
+</style>
+</head>
+<body>
+<h1>🚀 Neon Cosmic Catcher</h1>
+<div class="ui">
+<div>Score: <span id="score" class="score">0</span> | Lives: <span id="lives">3</span> | High: <span id="high">0</span></div>
+<button id="startBtn">Start Game</button>
+<div id="message" style="margin-top:10px; color:#ff00ff;"></div>
+</div>
+<canvas id="gameCanvas" width="800" height="500"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const livesEl = document.getElementById('lives');
+const highEl = document.getElementById('high');
+const startBtn = document.getElementById('startBtn');
+const messageEl = document.getElementById('message');
+
+let score = 0;
+let lives = 3;
+let highScore = localStorage.getItem('cosmicHigh') || 0;
+highEl.textContent = highScore;
+let gameRunning = false;
+let player = { x: 400, y: 450, width: 80, height: 20, speed: 8 };
+let items = [];
+let particles = [];
+let keys = {};
+let spawnTimer = 0;
+let difficulty = 1;
+
+function resize() {
+  // keep fixed for simplicity
+}
+window.addEventListener('keydown', e => keys[e.key] = true);
+window.addEventListener('keyup', e => keys[e.key] = false);
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  player.x = e.clientX - rect.left - player.width/2;
+  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+});
+
+function spawnItem() {
+  const isGood = Math.random() > 0.25;
+  items.push({
+    x: Math.random() * (canvas.width - 30),
+    y: -30,
+    size: isGood ? 20 : 25,
+    speed: 2 + Math.random() * 3 * difficulty,
+    good: isGood,
+    color: isGood ? '#ffff00' : '#ff0044',
+    glow: isGood ? '#ffff88' : '#ff4488'
+  });
+}
+
+function createParticles(x, y, color) {
+  for (let i = 0; i < 15; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8,
+      life: 30,
+      color
+    });
+  }
+}
+
+function update() {
+  if (!gameRunning) return;
+  if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
+  if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
+  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+
+  spawnTimer++;
+  if (spawnTimer > 40 / difficulty) {
+    spawnItem();
+    spawnTimer = 0;
+  }
+
+  items.forEach((item, i) => {
+    item.y += item.speed;
+    if (item.y > canvas.height) {
+      items.splice(i, 1);
+      return;
+    }
+    // collision
+    if (item.x < player.x + player.width &&
+        item.x + item.size > player.x &&
+        item.y < player.y + player.height &&
+        item.y + item.size > player.y) {
+      if (item.good) {
+        score += 10;
+        createParticles(item.x, item.y, '#ffff00');
+        playSound(800, 0.1);
+      } else {
+        lives--;
+        createParticles(item.x, item.y, '#ff0000');
+        playSound(200, 0.2);
+        if (lives <= 0) endGame();
+      }
+      items.splice(i, 1);
+    }
+  });
+
+  particles.forEach((p, i) => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  });
+
+  difficulty = 1 + score / 200;
+  scoreEl.textContent = score;
+  livesEl.textContent = lives;
+}
+
+function draw() {
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // stars background
+  for (let i = 0; i < 50; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.5})`;
+    ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 1, 1);
+  }
+
+  // player neon paddle
+  ctx.fillStyle = '#00ffff';
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = '#00ffff';
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+  ctx.shadowBlur = 0;
+
+  items.forEach(item => {
+    ctx.fillStyle = item.color;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = item.glow;
+    ctx.beginPath();
+    ctx.arc(item.x + item.size/2, item.y + item.size/2, item.size/2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+
+  particles.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life / 30;
+    ctx.fillRect(p.x, p.y, 3, 3);
+    ctx.globalAlpha = 1;
+  });
+}
+
+function playSound(freq, duration) {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.1, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + duration);
+    osc.start();
+    osc.stop(ac.currentTime + duration);
+  } catch(e) {}
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  score = 0;
+  lives = 3;
+  items = [];
+  particles = [];
+  difficulty = 1;
+  gameRunning = true;
+  messageEl.textContent = 'Catch the yellow stars! Avoid red asteroids!';
+  startBtn.style.display = 'none';
+  gameLoop();
+}
+
+function endGame() {
+  gameRunning = false;
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('cosmicHigh', highScore);
+    highEl.textContent = highScore;
+    messageEl.textContent = `New High Score! ${score}`;
+  } else {
+    messageEl.textContent = `Game Over! Score: ${score}`;
+  }
+  startBtn.style.display = 'inline-block';
+  startBtn.textContent = 'Play Again';
+}
+
+startBtn.addEventListener('click', startGame);
+gameLoop(); // for initial draw
+</script>
+</body>
+</html>
